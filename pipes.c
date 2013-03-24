@@ -11,7 +11,9 @@
 
 int main(int argc, char const *argv[], char *envp[])
 {
-	
+	char *printenv[] = {"printenv", NULL};
+	char *sort[] = {"sort", NULL};
+	char *less[] = {"less", NULL};
 	int pipe_desc[2];
 	int secpipe[2];
 	int retval = pipe (pipe_desc);
@@ -34,7 +36,7 @@ int main(int argc, char const *argv[], char *envp[])
 		retval = close (pipe_desc [READ]);
 		retval = close (secpipe [WRITE]);
 		retval = close (secpipe [READ]);
-		execlp ("printenv", "printenv", (char *) 0);
+		execvp (*printenv, printenv);
 		exit (0);
 		//child
 	}
@@ -48,7 +50,7 @@ int main(int argc, char const *argv[], char *envp[])
 		retval = close (pipe_desc [WRITE]);
 		retval = close (secpipe [WRITE]);
 		retval = close (secpipe [READ]);
-		execlp ("sort", "sort", (char *) 0);
+		execvp (*sort, sort);
 		exit (0);
 	}
 	pid = fork ();
@@ -58,16 +60,17 @@ int main(int argc, char const *argv[], char *envp[])
 		retval = close (pipe_desc [WRITE]);
 		retval = close (secpipe [READ]);
 		retval = close (secpipe [WRITE]);
-		printf ("POIPES\n");
-		retval = execlp ("/usr/bin/less", "/usr/bin/less", (char *) 0L);
+		retval = execvp (*less, less);
 		printf("retval: %d\n", retval);
 		printf("%d\n", errno);
 		exit (0);
 	}
-		retval = close (pipe_desc [READ]);
-		retval = close (pipe_desc [WRITE]);
-		retval = close (secpipe [READ]);
-		retval = close (secpipe [WRITE]);
-	return retval;
-	exit (0);
+	retval = close (pipe_desc [READ]);
+	retval = close (pipe_desc [WRITE]);
+	retval = close (secpipe [READ]);
+	retval = close (secpipe [WRITE]);
+	int status;
+	int i;
+	for (i = 0; i < 3; i++)
+		wait(&status);
 }
