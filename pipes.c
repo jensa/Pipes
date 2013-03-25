@@ -10,115 +10,118 @@
 #define READ ( 0 )
 #define WRITE ( 1 )
 
+int first_pipe[2];
+int second_pipe[2];
+int third_pipe[2];
+
+void err (char * msg){
+	fprintf (stderr, "%s",msg);
+}
+
+void close_pipes (){
+	int retval = close (first_pipe [WRITE]);
+	if (retval == -1)
+		err ("failed to close pipe");
+	retval = close (first_pipe [READ]);
+	if (retval == -1)
+		err ("failed to close pipe");
+	retval = close (second_pipe [WRITE]);
+	if (retval == -1)
+		err ("failed to close pipe");
+	retval = close (second_pipe [READ]);
+	if (retval == -1)
+		err ("failed to close pipe");
+	retval = close (third_pipe [WRITE]);
+	if (retval == -1)
+		err ("failed to close pipe");
+	retval = close (third_pipe [READ]);
+	if (retval == -1)
+		err ("failed to close pipe");
+}
+
 int main(int argc, char *argv[], char *envp[])
 {
-	char *printenv[] = {"printenv", NULL};
-	char *sort[] = {"sort", NULL};
-	char *less[] = {"less", NULL};
-	char *params[100];
-	int i;
-	params[0] = "grep";
-	params[1] = "-E";
-	char pattern[80];
-	strcpy (pattern,"");
+	bool useGrep = true; /* used to indicate whether grep should be called*/
+	if (argc < 2) /*find out whether any arguments were used (i.e. grep should be called) */
+	useGrep = false;
+	int i; /* loop variable*/
+	char pattern[80]; /* the grep pattern string (first|second|third) for the arguments given */
+	strcpy (pattern,""); /*initialize the pattern string for concatenation*/
 	for (i=1;i<argc-1;i++){
-		//strcat (pattern, "(");
-		strcat (pattern, argv[i]);
-		strcat (pattern, "|");
+		strcat (pattern, argv[i]); /*concatenate the argument to the pattern string*/
+		strcat (pattern, "|"); /*word delimiter required for grep -E*/
 	}
-	strcat (pattern, argv[argc-1]);
-	params[2] = pattern;
-	params[3] = NULL;
-	int first_pipe[2];
-	int second_pipe[2];
-	int third_pipe[2];
-	int retval = pipe (first_pipe);
-	retval = pipe (second_pipe);
-	retval = pipe (third_pipe);
+	strcat (pattern, argv[argc-1]); /*concatenate the last argument to the pattern*/
 
-	//long i;
-	//Read command line args
-	bool useGrep = true;
-	if (argc < 2){
-		useGrep = false;
-		printf ("NOARGS\n");
-	} else{
-		printf ("ARGS\n");
+	char *printenv[] = {"printenv", NULL}; /* args for printenv*/
+	char *sort[] = {"sort", NULL}; /* args for sort */
+	char *less[] = {"less", NULL}; /* args for less*/
+	char *grep[] = {"grep", "-E", pattern, NULL}; /* args for grep */
+	
+	int retval = pipe (first_pipe); /*create first pipe */
+	if (retval == -1){
+		err ("Failed to create first pipe");
 	}
-	int pid = fork ();
+	retval = pipe (second_pipe); /* create second pipe */
+	if (retval == -1){
+		err ("Failed to create second pipe");
+	}
+	retval = pipe (third_pipe); /* create third pipe */
+	if (retval == -1){
+		err ("Failed to create third pipe");
+	}
+	int pid = fork (); /*fork first process */
 	if (pid == 0){
 		if (useGrep)
-			retval = dup2 (first_pipe [WRITE], STDOUT_FILENO);
+			retval = dup2 (first_pipe [WRITE], STDOUT_FILENO); /* redirect STDOUT to the first pipe write end*/
 		else
-			retval = dup2 (second_pipe[WRITE], STDOUT_FILENO);
+			retval = dup2 (second_pipe[WRITE], STDOUT_FILENO); /* redirect STDOUT to the second pipe write end (skip first pipe) */
 		if (retval == -1){
-			printf ("Failed to %s", "blev ingen pipe");
+			err ("dup2 failed");
 		}
-		retval = close (first_pipe [WRITE]);
-		retval = close (first_pipe [READ]);
-		retval = close (second_pipe [WRITE]);
-		retval = close (second_pipe [READ]);
-		retval = close (third_pipe [WRITE]);
-		retval = close (third_pipe [READ]);
-		execvp (*printenv, printenv);
-		exit (0);
-		//child
+		close_pipes (); /* close all pipe ends */
+		execvp (*printenv, printenv); /* execute printenv */
+		exit (0); /* exit child process */
 	}
 	if (useGrep){
 		pid = fork ();
 		if (pid == 0){
-			//printf ("%s, %s, %s", params[0], params[1], params[2]);
-			retval = dup2 (first_pipe [READ], STDIN_FILENO);
-			retval = dup2 (second_pipe [WRITE], STDOUT_FILENO);
+			retval = dup2 (first_pipe [READ], STDIN_FILENO); /* redirect STDIN to first pipe read end*/
 			if (retval == -1)
-				printf ("Failed to %s", "dup2");
-			retval = close (first_pipe [READ]);
-			retval = close (first_pipe [WRITE]);
-			retval = close (second_pipe [WRITE]);
-			retval = close (second_pipe [READ]);
-			retval = close (third_pipe [WRITE]);
-			retval = close (third_pipe [READ]);
-			execvp (*params, params);
-			exit (0);
+				err ("dup2 failed");
+			retval = dup2 (second_pipe [WRITE], STDOUT_FILENO); /*redirect STDOUT to second pipe */
+			if (retval == -1)
+				err ("dup2 failed");
+			close_pipes (); /* close all pipes */
+			execvp (*grep, grep); /* execute grep with parameters */
+			exit (0); /* exit child process */
 		}
 	}
 	pid = fork ();
 	if (pid == 0){
-		retval = dup2 (second_pipe [READ], STDIN_FILENO);
-		retval = dup2 (third_pipe [WRITE], STDOUT_FILENO);
+		retval = dup2 (second_pipe [READ], STDIN_FILENO); /* redirect STDIN to second pipe read end */
 		if (retval == -1)
-			printf ("Failed to %s", "dup2");
-		retval = close (first_pipe [READ]);
-		retval = close (first_pipe [WRITE]);
-		retval = close (second_pipe [WRITE]);
-		retval = close (second_pipe [READ]);
-		retval = close (third_pipe [WRITE]);
-		retval = close (third_pipe [READ]);
-		execvp (*sort, sort);
-		exit (0);
+			err ("dup2 failed");
+		retval = dup2 (third_pipe [WRITE], STDOUT_FILENO); /* redirect STDOUT to third pipe write end */
+		if (retval == -1)
+			err ("dup2 failed");
+		close_pipes (); /* close all pipe ends */
+		execvp (*sort, sort); /* execute sort */
+		exit (0); /*exit child process */
 	}
 	pid = fork ();
 	if (pid == 0){
-		retval = dup2 (third_pipe [READ], STDIN_FILENO);
-		retval = close (first_pipe [READ]);
-		retval = close (first_pipe [WRITE]);
-		retval = close (second_pipe [WRITE]);
-		retval = close (second_pipe [READ]);
-		retval = close (third_pipe [READ]);
-		retval = close (third_pipe [WRITE]);
-		retval = execvp (*less, less);
-		printf("retval: %d\n", retval);
-		printf("%d\n", errno);
-		exit (0);
+		retval = dup2 (third_pipe [READ], STDIN_FILENO); /* redirect STDIN to third pipe read end */
+		if (retval == -1)
+			err ("dup2 failed");
+		close_pipes (); /* close all pipe ends */
+		retval = execvp (*less, less); /* execute less */
+		if (retval == -1)
+			err ("execution of less failed");
+		exit (0); /* exit from child process */
 	}
-	retval = close (first_pipe [READ]);
-	retval = close (first_pipe [WRITE]);
-	retval = close (second_pipe [WRITE]);
-	retval = close (second_pipe [READ]);
-	retval = close (third_pipe [READ]);
-	retval = close (third_pipe [WRITE]);
-	int status;
+	close_pipes (); /* close all pipe ends in parent process */
 	for (i = 0; i < 4; i++)
-		wait(&status);
-	exit (0);
+		wait(NULL); /* wait for all child processes to end */
+	exit (0); /* exit parent process cleanly */
 }
