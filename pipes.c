@@ -17,7 +17,11 @@ int third_pipe[2];
 void err (char * msg){
 	fprintf (stderr, "%s",msg);
 }
-
+/* close_pipes
+*
+* close_pipes closes the ends of all pipes.
+*
+*/
 void close_pipes (){
 	int retval = close (first_pipe [WRITE]);
 	if (retval == -1)
@@ -80,7 +84,9 @@ int main(int argc, char *argv[], char *envp[])
 			err ("dup2 failed");
 		}
 		close_pipes (); /* close all pipe ends */
-		execvp (*printenv, printenv); /* execute printenv */
+		retval = execvp (*printenv, printenv); /* execute printenv */
+		if (retval == -1)
+			err ("execution of printenv failed")
 		exit (0); /* exit child process */
 	}
 	if (useGrep){
@@ -93,7 +99,9 @@ int main(int argc, char *argv[], char *envp[])
 			if (retval == -1)
 				err ("dup2 failed");
 			close_pipes (); /* close all pipes */
-			execvp (*grep, grep); /* execute grep with parameters */
+			retval = execvp (*grep, grep); /* execute grep with parameters */
+			if (retval == -1)
+				err ("execution of grep failed")
 			exit (0); /* exit child process */
 		}
 	}
@@ -106,7 +114,9 @@ int main(int argc, char *argv[], char *envp[])
 		if (retval == -1)
 			err ("dup2 failed");
 		close_pipes (); /* close all pipe ends */
-		execvp (*sort, sort); /* execute sort */
+		retval = execvp (*sort, sort); /* execute sort */
+		if (retval == -1)
+			err ("execution of sort failed")
 		exit (0); /*exit child process */
 	}
 	pid = fork ();
