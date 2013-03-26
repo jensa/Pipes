@@ -89,6 +89,8 @@ int main(int argc, char *argv[], char *envp[])
 			err ("execution of printenv failed")
 		exit (0); /* exit child process */
 	}
+	 if( -1 == pid ) /* fork() misslyckades */
+ 		{ perror( "Cannot fork()" ); exit( 1 ); }
 	if (useGrep){
 		pid = fork ();
 		if (pid == 0){
@@ -104,6 +106,8 @@ int main(int argc, char *argv[], char *envp[])
 				err ("execution of grep failed")
 			exit (0); /* exit child process */
 		}
+		if( -1 == pid ) /* fork() misslyckades */
+ 			{ perror( "Cannot fork()" ); exit( 1 ); }
 	}
 	pid = fork ();
 	if (pid == 0){
@@ -119,6 +123,8 @@ int main(int argc, char *argv[], char *envp[])
 			err ("execution of sort failed")
 		exit (0); /*exit child process */
 	}
+	if( -1 == pid ) /* fork() misslyckades */
+ 		{ perror( "Cannot fork()" ); exit( 1 ); }
 	pid = fork ();
 	if (pid == 0){
 		retval = dup2 (third_pipe [READ], STDIN_FILENO); /* redirect STDIN to third pipe read end */
@@ -130,6 +136,8 @@ int main(int argc, char *argv[], char *envp[])
 			err ("execution of less failed");
 		exit (0); /* exit from child process */
 	}
+	if( -1 == pid ) /* fork() misslyckades */
+ 		{ perror( "Cannot fork()" ); exit( 1 ); }
 	close_pipes (); /* close all pipe ends in parent process */
 	for (i = 0; i < 4; i++)
 		wait(NULL); /* wait for all child processes to end */
