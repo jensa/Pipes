@@ -1,3 +1,26 @@
+/*
+ *
+ * NAME:
+ *   digenv -  a program for searching through and reading environment variables
+ * 
+ * SYNTAX:
+ *   digenv searchterms
+ *
+ * DESCRIPTION:
+ *	digenv executes the command printenv | grep searchterms | sort | $PAGER, 
+ *	thus presenting the environment variables whose values or names match any of the search terms in a pager.
+ *	If the PAGER environment variable is undefined, digenv uses less as the pager, 
+ *	or more if less is unavailable.
+ *	
+ *	if no arguments are given, the grep step is simply omitted, 
+ *	and the full output of printenv is presented in the pager.
+ *
+ * EXAMPLES:
+ *   digenv SSH PATH
+ *
+ * SEE ALSO:
+ *   printenv ()
+ */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

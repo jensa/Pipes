@@ -1,2 +1,2 @@
 all:
-	gcc -Wall -o pipes pipes.c
+	gcc -Wall -o digenv digenv.c
