@@ -7,17 +7,19 @@
 #include <errno.h>
 #include <sys/wait.h>
 
-#define READ ( 0 )
-#define WRITE ( 1 )
+#define READ ( 0 ) /* the index of the read end of the file descriptor arrays filled by pipe (1)*/
+#define WRITE ( 1 ) /* the index of the write end of the file descriptor arrays filled by pipe(1)*/
 
-int first_pipe[2];
-int second_pipe[2];
-int third_pipe[2];
+int first_pipe[2]; /* the pipe between he printenv and grep processes. Unused if program is strted without arguments */
+int second_pipe[2]; /* the pipe between the grep and sort processes. If grep is not to be called, this pipe connects the printenv and sort processes */
+int third_pipe[2]; /* the pipe between the sort and less processes */
 
+/* prints the specified string to STDERR*/
 void err (char * msg){
 	fprintf (stderr, "%s",msg);
 }
 
+/* calls close (1) on both pipe ends of all three pipes*/ 
 void close_pipes (){
 	int retval = close (first_pipe [WRITE]);
 	if (retval == -1)
@@ -38,7 +40,9 @@ void close_pipes (){
 	if (retval == -1)
 		err ("failed to close pipe");
 }
-
+/**
+* Main entry for program. Runs the command printenv | grep parameters | sort | less
+*/
 int main(int argc, char *argv[], char *envp[])
 {
 	bool useGrep = true; /* used to indicate whether grep should be called*/
@@ -83,8 +87,8 @@ int main(int argc, char *argv[], char *envp[])
 		execvp (*printenv, printenv); /* execute printenv */
 		exit (0); /* exit child process */
 	}
-	if (useGrep){
-		pid = fork ();
+	if (useGrep){ /* only fork this process if we want to call grep */
+		pid = fork (); /* fork process executing grep */
 		if (pid == 0){
 			retval = dup2 (first_pipe [READ], STDIN_FILENO); /* redirect STDIN to first pipe read end*/
 			if (retval == -1)
@@ -97,7 +101,7 @@ int main(int argc, char *argv[], char *envp[])
 			exit (0); /* exit child process */
 		}
 	}
-	pid = fork ();
+	pid = fork (); /* fork process executing sort */
 	if (pid == 0){
 		retval = dup2 (second_pipe [READ], STDIN_FILENO); /* redirect STDIN to second pipe read end */
 		if (retval == -1)
@@ -109,7 +113,7 @@ int main(int argc, char *argv[], char *envp[])
 		execvp (*sort, sort); /* execute sort */
 		exit (0); /*exit child process */
 	}
-	pid = fork ();
+	pid = fork (); /* fork process executing less */
 	if (pid == 0){
 		retval = dup2 (third_pipe [READ], STDIN_FILENO); /* redirect STDIN to third pipe read end */
 		if (retval == -1)
