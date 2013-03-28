@@ -40,7 +40,6 @@ int third_pipe[2]; /* the pipe between the sort_args and pager_args processes */
 /* prints the specified string to STDERR*/
 void err (char * msg){
 	perror (msg);
-	//fprintf (stderr, "%s",msg);
 	exit (1);
 }
 
@@ -74,15 +73,15 @@ void close_pipes (){
 */
 int main(int argc, char *argv[], char *envp[])
 {
-	char *pager;
-	pager = getenv ("PAGER"); /* get PAGER environemnt variable */
+	char *pager; /* initialize the pager name variable */
+	pager = getenv ("PAGER"); /* get PAGER environment variable */
 	if (pager == NULL)
 		pager = "less"; /* use less if PAGER is undefined */
-	bool usegrep_args = true; /* used to indicate whether grep_args should be called*/
-	if (argc < 2) /*find out whether any arguments were used (i.e. grep_args should be called) */
-	usegrep_args = false;
+	bool use_grep = true; /* used to indicate whether grep should be called*/
+	if (argc < 2) /*find out whether any arguments were used (i.e. grep should be called) */
+		use_grep = false;
 	int i; /* loop variable*/
-	char pattern[80]; /* the grep_args pattern string (first|second|third) for the arguments given */
+	char pattern[200]; /* the grep pattern string (first|second|third) for the arguments given */
 	strcpy (pattern,""); /*initialize the pattern string for concatenation*/
 	for (i=1;i<argc-1;i++){
 		strcat (pattern, argv[i]); /*concatenate the argument to the pattern string*/
@@ -108,8 +107,10 @@ int main(int argc, char *argv[], char *envp[])
 		err ("Failed to create third pipe");
 	}
 	int pid = fork (); /*fork first process */
+	if( -1 == pid ) /* fork() misslyckades */
+ 		err( "Cannot fork()" );
 	if (pid == 0){
-		if (usegrep_args)
+		if (use_grep)
 			retval = dup2 (first_pipe [WRITE], STDOUT_FILENO); /* redirect STDOUT to the first pipe write end*/
 		else
 			retval = dup2 (second_pipe[WRITE], STDOUT_FILENO); /* redirect STDOUT to the second pipe write end (skip first pipe) */
@@ -117,14 +118,11 @@ int main(int argc, char *argv[], char *envp[])
 			err ("dup2 failed");
 		}
 		close_pipes (); /* close all pipe ends */
-		retval = execvp (*printenv_args, printenv_args); /* execute printenv_args */
+		retval = execvp (*printenv_args, printenv_args); /* execute printenv */
 		if (retval == -1)
-			err ("execution of printenv_args failed");
-		exit (0); /* exit child process */
+			err ("execution of printenv failed");
 	}
-	if( -1 == pid ) /* fork() misslyckades */
- 		err( "Cannot fork()" );
-	if (usegrep_args){
+	if (use_grep){
 		pid = fork ();
 		if (pid == 0){
 			retval = dup2 (first_pipe [READ], STDIN_FILENO); /* redirect STDIN to first pipe read end*/
@@ -133,16 +131,17 @@ int main(int argc, char *argv[], char *envp[])
 			retval = dup2 (second_pipe [WRITE], STDOUT_FILENO); /*redirect STDOUT to second pipe */
 			if (retval == -1)
 				err ("dup2 failed");
-			close_pipes (); /* close all pipes */
-			retval = execvp (*grep_args, grep_args); /* execute grep_args with parameters */
+			close_pipes (); /* close all pipe ends */
+			retval = execvp (*grep_args, grep_args); /* execute grep with parameters */
 			if (retval == -1)
-				err ("execution of grep_args failed");
-			exit (0); /* exit child process */
+				err ("execution of grep failed");
 		}
 		if( -1 == pid ) /* fork() misslyckades */
- 			{ perror( "Cannot fork()" ); exit( 1 ); }
+			err( "Cannot fork()" );
 	}
-	pid = fork (); /* fork process executing sort_args */
+	pid = fork (); /* fork process executing sort */
+	if( -1 == pid ) /* fork() misslyckades */
+		err( "Cannot fork()" );
 	if (pid == 0){
 		retval = dup2 (second_pipe [READ], STDIN_FILENO); /* redirect STDIN to second pipe read end */
 		if (retval == -1)
@@ -151,14 +150,13 @@ int main(int argc, char *argv[], char *envp[])
 		if (retval == -1)
 			err ("dup2 failed");
 		close_pipes (); /* close all pipe ends */
-		retval = execvp (*sort_args, sort_args); /* execute sort_args */
+		retval = execvp (*sort_args, sort_args); /* execute sort */
 		if (retval == -1)
-			err ("execution of sort_args failed");
-		exit (0); /*exit child process */
+			err ("execution of sort failed");
 	}
-	if( -1 == pid ) /* fork() misslyckades */
-		err( "Cannot fork()" );
 	pid = fork ();
+	if( -1 == pid ) /* fork() misslyckades */
+ 		err( "Cannot fork()" );
 	if (pid == 0){
 		retval = dup2 (third_pipe [READ], STDIN_FILENO); /* redirect STDIN to third pipe read end */
 		if (retval == -1)
@@ -171,10 +169,7 @@ int main(int argc, char *argv[], char *envp[])
 		}
 		if (retval == -1)
 			err ("execution of pager failed");
-		exit (0); /* exit from child process */
 	}
-	if( -1 == pid ) /* fork() misslyckades */
- 		{ perror( "Cannot fork()" ); exit( 1 ); }
 	close_pipes (); /* close all pipe ends in parent process */
 	for (i = 0; i < 4; i++)
 		wait(NULL); /* wait for all child processes to end */
