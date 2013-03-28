@@ -90,11 +90,11 @@ int main(int argc, char *argv[], char *envp[])
 		close_pipes (); /* close all pipe ends */
 		retval = execvp (*printenv, printenv); /* execute printenv */
 		if (retval == -1)
-			err ("execution of printenv failed")
+			err ("execution of printenv failed");
 		exit (0); /* exit child process */
 	}
 	if( -1 == pid ) /* fork() misslyckades */
- 		{ err( "Cannot fork()" ); }
+ 		err( "Cannot fork()" );
 	if (useGrep){
 		pid = fork ();
 		if (pid == 0){
@@ -107,7 +107,7 @@ int main(int argc, char *argv[], char *envp[])
 			close_pipes (); /* close all pipes */
 			retval = execvp (*grep, grep); /* execute grep with parameters */
 			if (retval == -1)
-				err ("execution of grep failed")
+				err ("execution of grep failed");
 			exit (0); /* exit child process */
 		}
 		if( -1 == pid ) /* fork() misslyckades */
@@ -124,16 +124,12 @@ int main(int argc, char *argv[], char *envp[])
 		close_pipes (); /* close all pipe ends */
 		retval = execvp (*sort, sort); /* execute sort */
 		if (retval == -1)
-			err ("execution of sort failed")
+			err ("execution of sort failed");
 		exit (0); /*exit child process */
 	}
-<<<<<<< HEAD
-	pid = fork (); /* fork process executing less */
-=======
 	if( -1 == pid ) /* fork() misslyckades */
- 		{ perror( "Cannot fork()" ); exit( 1 ); }
+		err( "Cannot fork()" );
 	pid = fork ();
->>>>>>> 7c82dc114d372d386a24fe3d1234fe3f6ed7a52c
 	if (pid == 0){
 		retval = dup2 (third_pipe [READ], STDIN_FILENO); /* redirect STDIN to third pipe read end */
 		if (retval == -1)
