@@ -16,10 +16,14 @@ int third_pipe[2]; /* the pipe between the sort and less processes */
 
 /* prints the specified string to STDERR*/
 void err (char * msg){
-	fprintf (stderr, "%s",msg);
+	perror (msg);
+	//fprintf (stderr, "%s",msg);
+	exit (1);
 }
 
-/* calls close (1) on both pipe ends of all three pipes*/ 
+/* close_pipes
+* close_pipes calls close (1) on both pipe ends of all three global pipes
+*/ 
 void close_pipes (){
 	int retval = close (first_pipe [WRITE]);
 	if (retval == -1)
@@ -84,11 +88,15 @@ int main(int argc, char *argv[], char *envp[])
 			err ("dup2 failed");
 		}
 		close_pipes (); /* close all pipe ends */
-		execvp (*printenv, printenv); /* execute printenv */
+		retval = execvp (*printenv, printenv); /* execute printenv */
+		if (retval == -1)
+			err ("execution of printenv failed")
 		exit (0); /* exit child process */
 	}
-	if (useGrep){ /* only fork this process if we want to call grep */
-		pid = fork (); /* fork process executing grep */
+	if( -1 == pid ) /* fork() misslyckades */
+ 		{ err( "Cannot fork()" ); }
+	if (useGrep){
+		pid = fork ();
 		if (pid == 0){
 			retval = dup2 (first_pipe [READ], STDIN_FILENO); /* redirect STDIN to first pipe read end*/
 			if (retval == -1)
@@ -97,9 +105,13 @@ int main(int argc, char *argv[], char *envp[])
 			if (retval == -1)
 				err ("dup2 failed");
 			close_pipes (); /* close all pipes */
-			execvp (*grep, grep); /* execute grep with parameters */
+			retval = execvp (*grep, grep); /* execute grep with parameters */
+			if (retval == -1)
+				err ("execution of grep failed")
 			exit (0); /* exit child process */
 		}
+		if( -1 == pid ) /* fork() misslyckades */
+ 			{ perror( "Cannot fork()" ); exit( 1 ); }
 	}
 	pid = fork (); /* fork process executing sort */
 	if (pid == 0){
@@ -110,10 +122,18 @@ int main(int argc, char *argv[], char *envp[])
 		if (retval == -1)
 			err ("dup2 failed");
 		close_pipes (); /* close all pipe ends */
-		execvp (*sort, sort); /* execute sort */
+		retval = execvp (*sort, sort); /* execute sort */
+		if (retval == -1)
+			err ("execution of sort failed")
 		exit (0); /*exit child process */
 	}
+<<<<<<< HEAD
 	pid = fork (); /* fork process executing less */
+=======
+	if( -1 == pid ) /* fork() misslyckades */
+ 		{ perror( "Cannot fork()" ); exit( 1 ); }
+	pid = fork ();
+>>>>>>> 7c82dc114d372d386a24fe3d1234fe3f6ed7a52c
 	if (pid == 0){
 		retval = dup2 (third_pipe [READ], STDIN_FILENO); /* redirect STDIN to third pipe read end */
 		if (retval == -1)
@@ -124,6 +144,8 @@ int main(int argc, char *argv[], char *envp[])
 			err ("execution of less failed");
 		exit (0); /* exit from child process */
 	}
+	if( -1 == pid ) /* fork() misslyckades */
+ 		{ perror( "Cannot fork()" ); exit( 1 ); }
 	close_pipes (); /* close all pipe ends in parent process */
 	for (i = 0; i < 4; i++)
 		wait(NULL); /* wait for all child processes to end */
