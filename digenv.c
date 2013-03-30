@@ -44,6 +44,7 @@ void err (char * msg){
 }
 
 /* close_pipes
+*
 * close_pipes calls close (1) on both pipe ends of all three global pipes
 */ 
 void close_pipes (){
@@ -171,7 +172,12 @@ int main(int argc, char *argv[], char *envp[])
 			err ("execution of pager failed");
 	}
 	close_pipes (); /* close all pipe ends in parent process */
-	for (i = 0; i < 4; i++)
-		wait(NULL); /* wait for all child processes to end */
+	int status; /* value holding status of child processes */
+	for (i = 0; i < 4; i++){
+		wait(&status); /* wait for all child processes to end */
+		if (!WIFEXITED (status)){
+			err ("OMG");
+		}
+	}
 	exit (0); /* exit parent process cleanly */
 }
