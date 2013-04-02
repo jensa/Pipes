@@ -45,27 +45,40 @@ void err (char * msg){
 
 /* close_pipes
 *
-* close_pipes calls close (1) on both pipe ends of all three global pipes
+* close_pipes calls close (1) on both pipe ends (read/write) of all specified pipes.
+* Pipes are specified by passing a positive argument for each pipe to be closed,
+* and a zero argument for each pipe to skip.
+* For example, if wanting to close pipe 1 & 2, but not 3, call
+* close_pipes (1, 1, 0)
+*
+* close_pipes exits with err (1) if any of the close operations fail.
 */ 
-void close_pipes (){
-	int retval = close (first_pipe [WRITE]);
-	if (retval == -1)
-		err ("failed to close pipe");
-	retval = close (first_pipe [READ]);
-	if (retval == -1)
-		err ("failed to close pipe");
-	retval = close (second_pipe [WRITE]);
-	if (retval == -1)
-		err ("failed to close pipe");
-	retval = close (second_pipe [READ]);
-	if (retval == -1)
-		err ("failed to close pipe");
-	retval = close (third_pipe [WRITE]);
-	if (retval == -1)
-		err ("failed to close pipe");
-	retval = close (third_pipe [READ]);
-	if (retval == -1)
-		err ("failed to close pipe");
+void close_pipes (int first, int second, int third){
+	int retval;	
+	if (first){
+		retval = close (first_pipe [WRITE]);
+		if (retval == -1)
+			err ("failed to close pipe 1");
+		retval = close (first_pipe [READ]);
+		if (retval == -1)
+			err ("failed to close pipe 1");
+	}
+	if (second){
+		retval = close (second_pipe [WRITE]);
+		if (retval == -1)
+			err ("failed to close pipe 2");
+		retval = close (second_pipe [READ]);
+		if (retval == -1)
+			err ("failed to close pipe 2");
+	}
+	if (third){
+		retval = close (third_pipe [WRITE]);
+		if (retval == -1)
+			err ("failed to close pipe 3");
+		retval = close (third_pipe [READ]);
+		if (retval == -1)
+			err ("failed to close pipe 3");
+	}
 }
 /**
 * Main entry for digenv. Runs the command printenv | grep parameters | sort | $PAGER
@@ -82,6 +95,7 @@ int main(int argc, char *argv[], char *envp[])
 	if (argc < 2) /*find out whether any arguments were used (i.e. grep should be called) */
 		use_grep = false;
 	int i; /* loop variable*/
+	int status; /* value holding status of child processes */
 	char pattern[200]; /* the grep pattern string (first|second|third) for the arguments given */
 	strcpy (pattern,""); /*initialize the pattern string for concatenation*/
 	for (i=1;i<argc-1;i++){
@@ -107,8 +121,8 @@ int main(int argc, char *argv[], char *envp[])
 	if (retval == -1){
 		err ("Failed to create third pipe");
 	}
-	int pid = fork (); /*fork first process */
-	if( -1 == pid ) /* fork() misslyckades */
+	pid_t pid = fork (); /*fork first process executing printenv*/
+	if( -1 == pid ) /* fork() failed */
  		err( "Cannot fork()" );
 	if (pid == 0){
 		if (use_grep)
@@ -116,53 +130,78 @@ int main(int argc, char *argv[], char *envp[])
 		else
 			retval = dup2 (second_pipe[WRITE], STDOUT_FILENO); /* redirect STDOUT to the second pipe write end (skip first pipe) */
 		if (retval == -1){
-			err ("dup2 failed");
+			err ("dup2 failed@printenv");
 		}
-		close_pipes (); /* close all pipe ends */
+		close_pipes (1,1,1); /* close all pipe ends */
 		retval = execvp (*printenv_args, printenv_args); /* execute printenv */
 		if (retval == -1)
 			err ("execution of printenv failed");
 	}
+	waitpid (pid, &status, 0);
+	if (WIFEXITED (status)){ /* check if child process exited normally (i.e. not from a signal) */
+		if (WEXITSTATUS(status) != 0){
+			fprintf (stderr, "printenv terminated badly with exit code: %d\n", WEXITSTATUS (status));
+			exit (1); /* runtime error, exit with code 1 */
+		}
+	}
 	if (use_grep){
-		pid = fork ();
+		pid = fork (); /* fork process executing grep*/
+		if( -1 == pid ) /* fork() failed */
+			err( "Cannot fork()" );
 		if (pid == 0){
 			retval = dup2 (first_pipe [READ], STDIN_FILENO); /* redirect STDIN to first pipe read end*/
 			if (retval == -1)
-				err ("dup2 failed");
+				err ("dup2 failed@grep");
 			retval = dup2 (second_pipe [WRITE], STDOUT_FILENO); /*redirect STDOUT to second pipe */
 			if (retval == -1)
-				err ("dup2 failed");
-			close_pipes (); /* close all pipe ends */
+				err ("dup2 failed@grep");
+			close_pipes (1,1,1); /* close all pipe ends */
 			retval = execvp (*grep_args, grep_args); /* execute grep with parameters */
 			if (retval == -1)
 				err ("execution of grep failed");
 		}
-		if( -1 == pid ) /* fork() misslyckades */
-			err( "Cannot fork()" );
+		close_pipes (1,0,0);
+		waitpid (pid, &status, 0);
+		if (WIFEXITED (status)){ /* check if child process exited normally (i.e. not from a signal) */
+			if (WEXITSTATUS(status) > 1){
+				fprintf (stderr, "grep terminated badly with exit code: %d\n", WEXITSTATUS (status));
+				exit (1);
+			}
+		}
+	}else{
+		close_pipes (1,0,0); /* close pipe 1 */
 	}
 	pid = fork (); /* fork process executing sort */
-	if( -1 == pid ) /* fork() misslyckades */
+	if( -1 == pid ) /* fork() failed */
 		err( "Cannot fork()" );
 	if (pid == 0){
 		retval = dup2 (second_pipe [READ], STDIN_FILENO); /* redirect STDIN to second pipe read end */
 		if (retval == -1)
-			err ("dup2 failed");
+			err ("dup2 failed@sort");
 		retval = dup2 (third_pipe [WRITE], STDOUT_FILENO); /* redirect STDOUT to third pipe write end */
 		if (retval == -1)
-			err ("dup2 failed");
-		close_pipes (); /* close all pipe ends */
+			err ("dup2 failed@sort");
+		close_pipes (0, 1, 1); /* close pipe 2 and 3 */
 		retval = execvp (*sort_args, sort_args); /* execute sort */
 		if (retval == -1)
 			err ("execution of sort failed");
 	}
+	close_pipes (0, 1, 0); /* close pipe 2 */
+	waitpid (pid, &status, 0);
+	if (WIFEXITED (status)){ /* check if child process exited normally (i.e. not from a signal) */
+		if (WEXITSTATUS(status) != 0){
+			fprintf (stderr, "sort terminated badly with exit code: %d\n", WEXITSTATUS (status));
+			exit (1);
+		}
+	}
 	pid = fork ();
-	if( -1 == pid ) /* fork() misslyckades */
+	if( -1 == pid ) /* fork() failed */
  		err( "Cannot fork()" );
 	if (pid == 0){
 		retval = dup2 (third_pipe [READ], STDIN_FILENO); /* redirect STDIN to third pipe read end */
 		if (retval == -1)
 			err ("dup2 failed");
-		close_pipes (); /* close all pipe ends */
+		close_pipes (0, 0, 1); /* close pipe 3 */
 		retval = execvp (*pager_args, pager_args); /* execute pager*/
 		if (retval == -1){
 			pager_args[0] = "more";
@@ -171,12 +210,12 @@ int main(int argc, char *argv[], char *envp[])
 		if (retval == -1)
 			err ("execution of pager failed");
 	}
-	close_pipes (); /* close all pipe ends in parent process */
-	int status; /* value holding status of child processes */
-	for (i = 0; i < 4; i++){
-		wait(&status); /* wait for all child processes to end */
-		if (!WIFEXITED (status)){
-			err ("OMG");
+	close_pipes (0, 0, 1); /* close pipe 3*/
+	waitpid (pid, &status, 0);
+	if (WIFEXITED (status)){ /* check if child process exited normally (i.e. not from a signal) */
+		if (WEXITSTATUS(status) != 0){
+			fprintf (stderr, "%s terminated badly with exit code: %d\n",*pager_args, WEXITSTATUS (status));
+			exit (1);
 		}
 	}
 	exit (0); /* exit parent process cleanly */

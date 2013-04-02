@@ -1,5 +1,5 @@
-Script started on Sat 30 Mar 2013 09:44:34 CET
-]0;jens@ubuntu: ~/OS/Pipesjens@ubuntu:~/OS/Pipes$ ./digenv SSHsshubuntugcc -Wall -o digenv digenv.c
+Script started on Tue 02 Apr 2013 22:12:32 CEST
+]0;jens@ubuntu: ~/OS/Pipesjens@ubuntu:~/OS/Pipes$ gcc -Wall -o digenv digenv.c
 ]0;jens@ubuntu: ~/OS/Pipesjens@ubuntu:~/OS/Pipes$ exit
 
-Script done on Sat 30 Mar 2013 09:44:40 CET
+Script done on Tue 02 Apr 2013 22:12:50 CEST
